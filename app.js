@@ -440,6 +440,104 @@ $('#nameInput').onkeydown = ev => { if (ev.key === 'Enter') nameDone(); };
 $('#btnCreate').onclick = () => askName('', v => { const p = fresh(v); lib.pres.push(p); save(); openPres(p); });
 $('#btnHome').onclick = () => { save(); showHome(); };
 
+/* ---------- поделиться: презентация целиком внутри ссылки ---------- */
+const toB64 = bytes => { let s = ''; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
+const fromB64 = t => { t = t.replace(/-/g, '+').replace(/_/g, '/'); while (t.length % 4) t += '='; const s = atob(t), b = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) b[i] = s.charCodeAt(i); return b; };
+async function pipe(bytes, stream) {
+  const w = stream.writable.getWriter(); w.write(bytes); w.close();
+  return new Uint8Array(await new Response(stream.readable).arrayBuffer());
+}
+function shrinkImage(src) { // для ссылки уменьшаем фото, иначе она будет огромной
+  if (!src.startsWith('data:')) return Promise.resolve(src);
+  return new Promise(res => {
+    const im = new Image();
+    im.onload = () => {
+      const k = Math.min(1, 700 / im.naturalWidth, 700 / im.naturalHeight);
+      const c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(im.naturalWidth * k)); c.height = Math.max(1, Math.round(im.naturalHeight * k));
+      const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(im, 0, 0, c.width, c.height);
+      res(c.toDataURL('image/jpeg', 0.6));
+    };
+    im.onerror = () => res(src);
+    im.src = src;
+  });
+}
+async function makeShareLink(p) {
+  const slides = [];
+  for (const s of p.slides) {
+    const els = [];
+    for (const e of s.els) { const c = { ...e }; delete c.id; if (c.type === 'image') c.src = await shrinkImage(c.src); els.push(c); }
+    slides.push({ bg: s.bg, els });
+  }
+  const bytes = await pipe(new TextEncoder().encode(JSON.stringify({ t: p.title, s: slides })), new CompressionStream('deflate-raw'));
+  return location.href.split('#')[0] + '#v1=' + toB64(bytes);
+}
+async function readShareLink(hash) {
+  const bytes = await pipe(fromB64(hash.slice(4)), new DecompressionStream('deflate-raw'));
+  const d = JSON.parse(new TextDecoder().decode(bytes));
+  if (!d || !Array.isArray(d.s) || !d.s.length) throw 0;
+  return { id: uid(), title: d.t || 'Без названия', updated: Date.now(),
+    slides: d.s.map(s => ({ id: uid(), bg: s.bg || '#ffffff', els: (s.els || []).map(e => ({ ...e, id: uid() })) })) };
+}
+$('#btnShare').onclick = async () => {
+  blurEditing();
+  if (typeof CompressionStream === 'undefined') return toast('Этот браузер не умеет делать ссылки. Обновите Chrome.');
+  const box = $('#shareLink');
+  box.value = 'Готовим ссылку…'; $('#shareInfo').textContent = '';
+  $('#shareSend').hidden = !navigator.share;
+  $('#shareModal').hidden = false;
+  try {
+    const link = await makeShareLink(state);
+    box.value = link;
+    $('#shareInfo').textContent = link.length > 3500
+      ? 'Ссылка длинная (' + link.length + ' знаков): мессенджеры могут её обрезать. Если так, уберите часть фото.'
+      : 'Ссылка готова. Нажмите «Копировать» и отправьте её.';
+  } catch (e) { box.value = ''; $('#shareInfo').textContent = 'Не получилось сделать ссылку.'; }
+};
+$('#shareClose').onclick = () => { $('#shareModal').hidden = true; };
+$('#shareCopy').onclick = async () => {
+  const box = $('#shareLink');
+  try { await navigator.clipboard.writeText(box.value); toast('Ссылка скопирована'); }
+  catch (e) { box.focus(); box.select(); toast('Выделите ссылку и скопируйте'); }
+};
+$('#shareSend').onclick = () => { navigator.share({ title: state.title, url: $('#shareLink').value }).catch(() => {}); };
+
+/* ---------- просмотр по ссылке ---------- */
+let shared = null, vi = 0;
+function fitViewer() {
+  const w = $('#viewerWrap'), k = Math.min((w.clientWidth - 16) / W, (w.clientHeight - 16) / H);
+  if (!(k > 0)) return;
+  $('#viewerBox').style.width = W * k + 'px'; $('#viewerBox').style.height = H * k + 'px';
+  $('#viewerStage').style.transform = `scale(${k})`;
+}
+function showViewer() {
+  fillStage($('#viewerStage'), shared.slides[vi], false);
+  $('#vCount').textContent = (vi + 1) + ' / ' + shared.slides.length;
+  $('#vPrev').disabled = vi === 0; $('#vNext').disabled = vi === shared.slides.length - 1;
+  fitViewer();
+}
+async function openShared() {
+  try { shared = await readShareLink(location.hash); }
+  catch (e) { toast('Эта ссылка не открывается'); history.replaceState(null, '', location.href.split('#')[0]); return showHome(); }
+  vi = 0;
+  document.title = shared.title;
+  $('#viewerTitle').textContent = shared.title;
+  $('#home').hidden = true; $('#editor').hidden = true; $('#viewer').hidden = false;
+  showViewer();
+}
+$('#vPrev').onclick = () => { if (vi > 0) { vi--; showViewer(); } };
+$('#vNext').onclick = () => { if (vi < shared.slides.length - 1) { vi++; showViewer(); } };
+$('#btnSaveCopy').onclick = () => {
+  lib.pres.push(shared); save();
+  history.replaceState(null, '', location.href.split('#')[0]);
+  $('#viewer').hidden = true;
+  const p = shared; shared = null;
+  openPres(p);
+  toast('Копия сохранена у вас');
+};
+addEventListener('resize', () => { if (shared && !$('#viewer').hidden) fitViewer(); });
+addEventListener('hashchange', () => { if (location.hash.startsWith('#v1=')) openShared(); });
+
 /* ---------- показ ---------- */
 let pi = 0;
 function showPres() {
@@ -482,7 +580,7 @@ addEventListener('keydown', ev => {
   }
 });
 
-showHome();
+if (location.hash.startsWith('#v1=')) openShared(); else showHome();
 
 // установка как приложение: офлайн-кэш (работает при открытии по http/https)
 if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {

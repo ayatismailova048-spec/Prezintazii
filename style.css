@@ -118,3 +118,20 @@ label.btn input { position: absolute; inset: 0; width: 100%; height: 100%; opaci
   .card-name { font-size: 16px; }
   .create { font-size: 18px; padding: 12px 20px; }
 }
+
+/* поделиться и просмотр по ссылке */
+.share-btn { flex: none; height: 48px; padding: 0 14px; background: #f0f0f0; border: 3px solid #a0a0a0; border-radius: 12px; font-weight: 700; font-size: 14px; }
+.share-btn:active { background: #ddd; }
+.hint { margin: 0; font-size: 13px; color: #555; }
+.name-card textarea { font: 13px/1.3 monospace; padding: 8px; border: 3px solid #a0a0a0; border-radius: 10px; resize: none; user-select: text; -webkit-user-select: text; word-break: break-all; }
+.viewer { position: fixed; inset: 0; background: #ccc; display: flex; flex-direction: column; z-index: 120; }
+.viewer[hidden] { display: none; }
+.viewer-top { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: #f0f0f0; flex: none; }
+.viewer-title { flex: 1; min-width: 0; font-weight: 700; font-size: 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.viewer-top .btn { flex: none; font-size: 14px; padding: 6px 12px; }
+.viewer-wrap { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.viewer .stage { pointer-events: none; }
+.viewer-nav { display: flex; align-items: center; justify-content: center; gap: 24px; padding: 10px; background: #f0f0f0; flex: none; }
+.viewer-nav button { width: 56px; height: 48px; background: #f0f0f0; border: 3px solid #a0a0a0; border-radius: 12px; font-size: 18px; }
+.viewer-nav button:disabled { opacity: .35; }
+#vCount { font-weight: 700; min-width: 60px; text-align: center; }

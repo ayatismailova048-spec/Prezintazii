@@ -93,6 +93,7 @@
 
   <div class="strip">
     <div id="thumbs"></div>
+    <button id="btnShare" class="share-btn" aria-label="Поделиться">Поделиться</button>
     <button id="btnPresent" class="play" aria-label="Показ">▶</button>
   </div>
 </div>
@@ -124,6 +125,37 @@
     <div class="name-btns">
       <button id="nameCancel">Отмена</button>
       <button id="nameOk" class="primary">Готово</button>
+    </div>
+  </div>
+</div>
+
+<!-- Просмотр по ссылке (без редактирования) -->
+<div id="viewer" class="viewer" hidden>
+  <div class="viewer-top">
+    <span id="viewerTitle" class="viewer-title"></span>
+    <button id="btnSaveCopy" class="btn">Сохранить себе</button>
+  </div>
+  <div class="viewer-wrap" id="viewerWrap">
+    <div class="stage-box" id="viewerBox"><div class="stage" id="viewerStage"></div></div>
+  </div>
+  <div class="viewer-nav">
+    <button id="vPrev" aria-label="Назад">◀</button>
+    <span id="vCount"></span>
+    <button id="vNext" aria-label="Дальше">▶</button>
+  </div>
+</div>
+
+<!-- Поделиться -->
+<div id="shareModal" class="modal" hidden>
+  <div class="name-card">
+    <label for="shareLink">Ссылка на презентацию</label>
+    <p class="hint">Тот, кто откроет ссылку, сможет только смотреть презентацию. Менять её нельзя.</p>
+    <textarea id="shareLink" readonly rows="4"></textarea>
+    <p id="shareInfo" class="hint"></p>
+    <div class="name-btns">
+      <button id="shareClose">Закрыть</button>
+      <button id="shareCopy" class="primary">Копировать</button>
+      <button id="shareSend" class="primary">Отправить</button>
     </div>
   </div>
 </div>
