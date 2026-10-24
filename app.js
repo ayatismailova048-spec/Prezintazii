@@ -483,4 +483,9 @@ addEventListener('keydown', ev => {
 });
 
 showHome();
+
+// установка как приложение: офлайн-кэш (работает при открытии по http/https)
+if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+  try { navigator.serviceWorker.register('sw.js').catch(() => {}); } catch (e) {}
+}
 })();
