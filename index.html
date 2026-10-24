@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Презентации</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <input id="title" class="title" value="Новая презентация" spellcheck="false">
+  <div class="spacer"></div>
+  <button id="btnNew" title="Новая презентация">Новая</button>
+  <button id="btnExport" title="Сохранить в файл">Сохранить</button>
+  <button id="btnImport" title="Открыть файл">Открыть</button>
+  <button id="btnPrint" title="Печать / PDF">PDF</button>
+  <button id="btnPresent" class="primary">▶ Показ</button>
+  <input type="file" id="fileImport" accept=".json" hidden>
+</header>
+
+<div class="toolbar">
+  <button data-add="text">＋ Текст</button>
+  <button data-add="title">＋ Заголовок</button>
+  <button id="btnImage">🖼 Картинка</button>
+  <button id="btnImageUrl">🔗 Картинка по ссылке</button>
+  <button data-add="rect">▭ Прямоугольник</button>
+  <button data-add="ellipse">◯ Круг</button>
+  <span class="sep"></span>
+  <button data-cmd="bold"><b>B</b></button>
+  <button data-cmd="italic"><i>I</i></button>
+  <button data-cmd="underline"><u>U</u></button>
+  <button data-align="left" title="По левому краю">⇤</button>
+  <button data-align="center" title="По центру">↔</button>
+  <button data-align="right" title="По правому краю">⇥</button>
+  <label>Размер <input id="fontSize" type="number" min="8" max="200" value="32"></label>
+  <label>Цвет <input id="textColor" type="color" value="#222222"></label>
+  <label>Заливка <input id="fillColor" type="color" value="#4f8cff"></label>
+  <span class="sep"></span>
+  <label>Фон слайда <input id="bgColor" type="color" value="#ffffff"></label>
+  <button id="btnFront" title="На передний план">⬆</button>
+  <button id="btnBack" title="На задний план">⬇</button>
+  <button id="btnDelEl" title="Удалить элемент (Del)">🗑</button>
+  <input type="file" id="fileImage" accept="image/*" hidden>
+</div>
+
+<main class="layout">
+  <aside class="sidebar">
+    <div id="thumbs"></div>
+    <div class="slide-actions">
+      <button id="btnAddSlide" class="primary">＋ Слайд</button>
+      <button id="btnDupSlide">Копия</button>
+      <button id="btnDelSlide">Удалить</button>
+    </div>
+  </aside>
+  <section class="stage-wrap" id="stageWrap">
+    <div class="stage" id="stage"></div>
+  </section>
+</main>
+
+<div id="presenter" class="presenter" hidden>
+  <div class="stage" id="presStage"></div>
+  <div class="pres-hint">← → листать · Esc выход</div>
+</div>
+
+<div id="printArea"></div>
+<script src="app.js"></script>
+</body>
+</html>

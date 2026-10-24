@@ -1,0 +1,61 @@
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: #eef0f4; color: #222; }
+body { user-select: none; display: flex; flex-direction: column; }
+
+button { font: inherit; padding: 6px 10px; border: 1px solid #c9ced8; background: #fff; border-radius: 6px; cursor: pointer; }
+button:hover { background: #f1f4fa; }
+button.primary { background: #4f8cff; border-color: #4f8cff; color: #fff; }
+button.primary:hover { background: #3b78ec; }
+
+.topbar { display: flex; gap: 8px; align-items: center; padding: 8px 12px; background: #fff; border-bottom: 1px solid #dde1e8; }
+.title { user-select: text; font-size: 18px; font-weight: 600; border: 1px solid transparent; border-radius: 6px; padding: 4px 8px; min-width: 260px; }
+.title:hover, .title:focus { border-color: #c9ced8; outline: none; }
+.spacer { flex: 1; }
+
+.toolbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 6px 12px; background: #fff; border-bottom: 1px solid #dde1e8; }
+.toolbar label { display: flex; align-items: center; gap: 4px; font-size: 13px; color: #555; }
+.toolbar input[type=number] { width: 60px; padding: 4px; }
+.toolbar input[type=color] { width: 32px; height: 28px; padding: 0; border: 1px solid #c9ced8; border-radius: 4px; background: none; }
+.sep { width: 1px; height: 24px; background: #dde1e8; margin: 0 4px; }
+
+.layout { flex: 1; display: flex; min-height: 0; }
+.sidebar { width: 200px; background: #f7f8fb; border-right: 1px solid #dde1e8; display: flex; flex-direction: column; }
+#thumbs { flex: 1; overflow-y: auto; padding: 10px; }
+.thumb { position: relative; margin-bottom: 10px; cursor: pointer; border: 2px solid transparent; border-radius: 6px; background: #fff; overflow: hidden; width: 176px; height: 99px; box-shadow: 0 1px 3px rgba(0,0,0,.15); }
+.thumb.active { border-color: #4f8cff; }
+.thumb .num { position: absolute; left: 4px; top: 2px; font-size: 11px; color: #666; z-index: 2; background: rgba(255,255,255,.7); padding: 0 4px; border-radius: 3px; }
+.thumb .mini { position: absolute; left: 0; top: 0; transform-origin: 0 0; pointer-events: none; }
+.slide-actions { display: flex; gap: 4px; padding: 8px; border-top: 1px solid #dde1e8; }
+.slide-actions button { flex: 1; padding: 6px 4px; font-size: 13px; }
+
+.stage-wrap { flex: 1; display: flex; align-items: center; justify-content: center; overflow: auto; padding: 20px; }
+.stage { position: relative; width: 960px; height: 540px; background: #fff; box-shadow: 0 4px 20px rgba(0,0,0,.2); overflow: hidden; flex: none; transform-origin: center center; }
+
+.el { position: absolute; user-select: none; }
+.el.text { padding: 6px; line-height: 1.25; word-break: break-word; outline: none; cursor: move; }
+.el.text[contenteditable=true] { cursor: text; user-select: text; }
+.el img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; display: block; }
+.el.rect, .el.ellipse { cursor: move; }
+.el.ellipse { border-radius: 50%; }
+.stage.editing .el:hover { outline: 1px dashed #4f8cff; }
+.stage.editing .el.selected { outline: 2px solid #4f8cff; }
+.handle { position: absolute; right: -7px; bottom: -7px; width: 14px; height: 14px; background: #4f8cff; border: 2px solid #fff; border-radius: 50%; cursor: nwse-resize; z-index: 5; }
+
+.presenter { position: fixed; inset: 0; background: #000; display: flex; align-items: center; justify-content: center; z-index: 100; }
+.presenter[hidden] { display: none; }
+.presenter .stage { box-shadow: none; }
+.pres-hint { position: fixed; bottom: 10px; right: 14px; color: #888; font-size: 12px; opacity: .6; }
+
+#printArea { display: none; }
+@media print {
+  body > *:not(#printArea) { display: none !important; }
+  #printArea { display: block; }
+  #printArea .stage { box-shadow: none; page-break-after: always; transform: none !important; margin: 0; }
+  @page { size: 960px 540px; margin: 0; }
+}
+
+@media (max-width: 700px) {
+  .sidebar { width: 110px; }
+  .thumb { width: 86px; height: 48px; }
+  .title { min-width: 120px; }
+}
