@@ -1,15 +1,17 @@
 (() => {
 const W = 960, H = 540;
-const KEY = 'prezintazii.v1';
+const KEY = 'prezintazii.v2';
+const OLD_KEY = 'prezintazii.v1';
 const $ = s => document.querySelector(s);
 const uid = () => Math.random().toString(36).slice(2, 10);
 
-let state = load() || fresh();
+let lib = loadLib();   // { pres: [презентации] }
+let state = null;      // открытая презентация
 let cur = 0;          // current slide index
 let sel = null;       // selected element id
 
 function fresh() {
-  return { title: 'Новая презентация', slides: [newSlide(true)] };
+  return { id: uid(), title: 'Без названия', slides: [newSlide(true)], updated: Date.now() };
 }
 function newSlide(withTitle) {
   const s = { id: uid(), bg: '#ffffff', els: [] };
@@ -22,15 +24,23 @@ function newSlide(withTitle) {
 function mkText(text, x, y, w, h, size, bold, align) {
   return { id: uid(), type: 'text', x, y, w, h, text, size, bold: !!bold, italic: false, underline: false, align: align || 'left', color: '#222222' };
 }
-function load() {
-  try { const d = JSON.parse(localStorage.getItem(KEY)); if (d && d.slides && d.slides.length) return d; } catch (e) {}
-  return null;
+function loadLib() {
+  try {
+    const d = JSON.parse(localStorage.getItem(KEY));
+    if (d && Array.isArray(d.pres)) return d;
+  } catch (e) {}
+  try { // перенос презентации из первой версии
+    const o = JSON.parse(localStorage.getItem(OLD_KEY));
+    if (o && o.slides && o.slides.length) return { pres: [{ id: uid(), title: o.title || 'Без названия', slides: o.slides, updated: Date.now() }] };
+  } catch (e) {}
+  return { pres: [] };
 }
 let saveT;
 function save() {
+  if (state) state.updated = Date.now();
   clearTimeout(saveT);
   saveT = setTimeout(() => {
-    try { localStorage.setItem(KEY, JSON.stringify(state)); }
+    try { localStorage.setItem(KEY, JSON.stringify(lib)); }
     catch (e) { alert('Не удалось сохранить в браузере (слишком много картинок?). Используйте кнопку «Сохранить» для файла.'); }
   }, 200);
 }
@@ -110,7 +120,7 @@ function syncToolbar() {
   if (e.type === 'text') { $('#fontSize').value = e.size; $('#textColor').value = e.color; }
   else if (e.fill) $('#fillColor').value = e.fill;
 }
-addEventListener('resize', () => { fit(); renderThumbs(); });
+addEventListener('resize', () => { if (state) { fit(); renderThumbs(); } else renderHome(); });
 
 /* ---------- mouse interaction ---------- */
 const stageEl = $('#stage');
@@ -221,12 +231,6 @@ $('#btnDelSlide').onclick = () => {
 };
 
 /* ---------- file / title ---------- */
-$('#title').value = state.title;
-$('#title').oninput = ev => { state.title = ev.target.value; document.title = state.title || 'Презентации'; save(); };
-$('#btnNew').onclick = () => {
-  if (!confirm('Создать новую презентацию? Текущая будет удалена, если вы её не сохранили в файл.')) return;
-  state = fresh(); cur = 0; sel = null; $('#title').value = state.title; save(); render();
-};
 $('#btnExport').onclick = () => {
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([JSON.stringify(state)], { type: 'application/json' }));
@@ -242,7 +246,7 @@ $('#fileImport').onchange = ev => {
     try {
       const d = JSON.parse(r.result);
       if (!d.slides || !d.slides.length) throw 0;
-      state = d; cur = 0; sel = null; $('#title').value = state.title || ''; save(); render();
+      Object.assign(state, { title: d.title || state.title, slides: d.slides }); cur = 0; sel = null; $('#title').value = state.title; save(); render();
     } catch (e) { alert('Неверный файл презентации'); }
   };
   r.readAsText(f);
@@ -281,6 +285,7 @@ addEventListener('keydown', ev => {
     return;
   }
   const t = ev.target;
+  if (!state) return;
   if (t.isContentEditable || /INPUT|TEXTAREA/.test(t.tagName)) return;
   if ((ev.key === 'Delete' || ev.key === 'Backspace') && sel) { delEl(); ev.preventDefault(); }
   const e = selEl();
@@ -292,6 +297,57 @@ addEventListener('keydown', ev => {
   }
 });
 
-document.title = state.title || 'Презентации';
-render();
+
+/* ---------- главная: список презентаций ---------- */
+function showHome() {
+  state = null; sel = null;
+  document.title = 'Презентации';
+  $('#editor').hidden = true; $('#home').hidden = false;
+  renderHome();
+}
+function openPres(p, isNew) {
+  state = p; cur = 0; sel = null;
+  $('#home').hidden = true; $('#editor').hidden = false;
+  $('#title').value = p.title;
+  document.title = p.title || 'Презентации';
+  render();
+  if (isNew) { $('#title').focus(); $('#title').select(); }
+}
+function renderHome() {
+  const grid = $('#grid');
+  grid.innerHTML = '';
+  if (!lib.pres.length) {
+    grid.innerHTML = '<p class="empty">Пока нет презентаций. Нажмите «Создать презентацию +».</p>';
+    return;
+  }
+  lib.pres.slice().sort((a, b) => b.updated - a.updated).forEach(p => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    const name = document.createElement('div');
+    name.className = 'card-name';
+    name.textContent = p.title || 'Без названия';
+    const prev = document.createElement('div');
+    prev.className = 'card-prev';
+    const del = document.createElement('button');
+    del.className = 'card-del'; del.title = 'Удалить'; del.textContent = '×';
+    del.onclick = ev => {
+      ev.stopPropagation();
+      if (del.dataset.armed) { lib.pres = lib.pres.filter(x => x !== p); save(); renderHome(); return; }
+      del.dataset.armed = '1'; del.textContent = 'Удалить?'; del.classList.add('armed');
+      setTimeout(() => { del.dataset.armed = ''; del.textContent = '×'; del.classList.remove('armed'); }, 3000);
+    };
+    card.append(name, prev, del);
+    card.onclick = () => openPres(p);
+    grid.appendChild(card);
+    const mini = document.createElement('div');
+    mini.className = 'stage mini';
+    mini.style.cssText = `box-shadow:none;position:absolute;left:0;top:0;transform-origin:0 0;transform:scale(${prev.clientWidth / W})`;
+    fillStage(mini, p.slides[0], false);
+    prev.appendChild(mini);
+  });
+}
+$('#title').oninput = ev => { state.title = ev.target.value; document.title = state.title || 'Презентации'; save(); };
+$('#btnHome').onclick = () => { save(); showHome(); };
+$('#btnCreate').onclick = () => { const p = fresh(); lib.pres.push(p); save(); openPres(p, true); };
+showHome();
 })();

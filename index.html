@@ -7,10 +7,16 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<div id="home" class="home" hidden>
+  <div class="home-top"><button id="btnCreate" class="create">Создать презентацию +</button></div>
+  <div id="grid" class="grid"></div>
+</div>
+
+<div id="editor" class="editor" hidden>
 <header class="topbar">
-  <input id="title" class="title" value="Новая презентация" spellcheck="false">
+  <button id="btnHome" title="К списку презентаций">← Мои презентации</button>
+  <input id="title" class="title" placeholder="Название презентации" spellcheck="false">
   <div class="spacer"></div>
-  <button id="btnNew" title="Новая презентация">Новая</button>
   <button id="btnExport" title="Сохранить в файл">Сохранить</button>
   <button id="btnImport" title="Открыть файл">Открыть</button>
   <button id="btnPrint" title="Печать / PDF">PDF</button>
@@ -56,6 +62,7 @@
     <div class="stage" id="stage"></div>
   </section>
 </main>
+</div>
 
 <div id="presenter" class="presenter" hidden>
   <div class="stage" id="presStage"></div>
