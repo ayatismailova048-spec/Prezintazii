@@ -1,6 +1,6 @@
 // Кэш оболочки приложения: после первого запуска работает без интернета.
-const CACHE = 'prezintazii-v4';
-const FILES = ['./', 'index.html', 'style.css?v=4', 'app.js?v=4', 'manifest.webmanifest',
+const CACHE = 'prezintazii-v5';
+const FILES = ['./', 'index.html', 'style.css?v=5', 'app.js?v=5', 'manifest.webmanifest',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png', 'icons/apple-touch-icon.png'];
 
 self.addEventListener('install', e => {

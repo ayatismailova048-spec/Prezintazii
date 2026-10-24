@@ -14,7 +14,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&family=Lobster&family=Oswald:wght@400;700&family=Pacifico&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Roboto:ital,wght@0,400;0,700;1,400&display=swap&subset=cyrillic">
-<link rel="stylesheet" href="style.css?v=4">
+<link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
 
@@ -149,15 +149,11 @@
 <!-- Поделиться -->
 <div id="shareModal" class="modal" hidden>
   <div class="name-card">
-    <label for="shareLink">Ссылка на презентацию</label>
-    <p class="hint">Тот, кто откроет ссылку, сможет только смотреть презентацию. Менять её нельзя.</p>
-    <textarea id="shareLink" readonly rows="4"></textarea>
-    <p id="shareInfo" class="hint"></p>
+    <label>Поделиться презентацией</label>
+    <p class="hint">Презентация отправится файлом, вместе со всеми фото. Получатель откроет файл в приложении кнопкой «Открыть файл» и сможет только смотреть.</p>
     <div class="name-btns">
-      <button id="shareFile" class="primary">Отправить файлом</button>
       <button id="shareClose">Закрыть</button>
-      <button id="shareCopy" class="primary">Копировать</button>
-      <button id="shareSend" class="primary">Отправить</button>
+      <button id="shareFile" class="primary">Отправить файлом</button>
     </div>
   </div>
 </div>
@@ -169,6 +165,6 @@
 </div>
 
 <div id="toast" class="toast" hidden></div>
-<script src="app.js?v=4"></script>
+<script src="app.js?v=5"></script>
 </body>
 </html>
