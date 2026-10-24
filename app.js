@@ -270,6 +270,12 @@ $('#btnBack').onclick = () => { const a = slide().els, i = a.findIndex(e => e.id
 function delEl() { const a = slide().els, i = a.findIndex(e => e.id === sel); if (i >= 0) { a.splice(i, 1); sel = null; save(); render(); } }
 $('#btnDelEl').onclick = delEl;
 
+/* ---------- свернуть панель ---------- */
+$('#btnCollapse').onclick = () => {
+  const c = $('#panelArea').classList.toggle('collapsed');
+  $('#btnCollapse').setAttribute('aria-label', c ? 'Показать панель' : 'Скрыть панель');
+};
+
 /* ---------- слайды ---------- */
 $('#btnAddSlide').onclick = () => { blurEditing(); state.slides.splice(cur + 1, 0, newSlide()); cur++; sel = null; save(); render(); };
 $('#btnDupSlide').onclick = () => {

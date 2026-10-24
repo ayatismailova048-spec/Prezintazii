@@ -24,6 +24,12 @@ input, select { font: inherit; color: #000; }
 .editor { flex: 1; display: flex; flex-direction: column; min-height: 0; background: #ccc; }
 .panel { display: flex; justify-content: space-between; gap: 8px; padding: 8px 10px; background: #f0f0f0; flex: none; }
 .panel-left { min-width: 0; flex: 1; }
+.panel-area.collapsed .panel { display: none; }
+.collapse-row { display: flex; justify-content: center; flex: none; height: 30px; background: #ccc; }
+.collapse { width: 80px; height: 30px; padding: 0; border: 0; background: #f0f0f0; border-radius: 0 0 8px 8px; display: flex; align-items: center; justify-content: center; }
+.collapse svg { width: 26px; height: 26px; fill: none; stroke: #000; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.panel-area.collapsed + .collapse-row svg { transform: rotate(180deg); }
+.collapse-row { margin-top: 0; }
 .row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
 .btn, .x, .swatch-btn, .shape, .ctx button, .play, .modal button {
   background: #f0f0f0; border: 3px solid #a0a0a0; border-radius: 12px; font-weight: 700; padding: 5px 9px; font-size: 14px;
