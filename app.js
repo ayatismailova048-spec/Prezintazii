@@ -469,6 +469,7 @@ function shrinkImage(src) { // для ссылки уменьшаем фото, 
     im.src = src;
   });
 }
+const MAX_LINK = 4000; // длиннее мессенджеры режут на части и телефон зависает
 async function makeShareLink(p) {
   const slides = [];
   for (const s of p.slides) {
@@ -491,6 +492,7 @@ async function copyLinkFor(p) { // ссылка на презентацию: к�
   toast('Готовим ссылку…');
   let link;
   try { link = await makeShareLink(p); } catch (e) { return toast('Не получилось сделать ссылку'); }
+  if (link.length > MAX_LINK) return toast('Презентация слишком большая для ссылки (много фото). Ссылка не скопирована. Уберите фото или сократите презентацию.');
   try { await navigator.clipboard.writeText(link); toast('Ссылка скопирована. Её можно отправить: по ней презентацию можно только смотреть.'); }
   catch (e) { // если браузер не дал скопировать сам, показываем ссылку для ручного копирования
     $('#shareLink').value = link; $('#shareInfo').textContent = 'Выделите ссылку и скопируйте её.';
@@ -507,10 +509,13 @@ $('#btnShare').onclick = async () => {
   $('#shareModal').hidden = false;
   try {
     const link = await makeShareLink(state);
-    box.value = link;
-    $('#shareInfo').textContent = link.length > 3500
-      ? 'Ссылка длинная (' + link.length + ' знаков): мессенджеры могут её обрезать. Если так, уберите часть фото.'
-      : 'Ссылка готова. Нажмите «Копировать» и отправьте её.';
+    if (link.length > MAX_LINK) {
+      box.value = ''; $('#shareCopy').hidden = true; $('#shareSend').hidden = true;
+      $('#shareInfo').textContent = 'Презентация слишком большая для ссылки: ' + link.length + ' знаков, а можно до ' + MAX_LINK + '. Обычно мешают фото. Уберите часть фото или сократите презентацию, и ссылка получится.';
+    } else {
+      box.value = link; $('#shareCopy').hidden = false; $('#shareSend').hidden = !navigator.share;
+      $('#shareInfo').textContent = 'Ссылка готова. Нажмите «Копировать» и отправьте её.';
+    }
   } catch (e) { box.value = ''; $('#shareInfo').textContent = 'Не получилось сделать ссылку.'; }
 };
 $('#shareClose').onclick = () => { $('#shareModal').hidden = true; };
