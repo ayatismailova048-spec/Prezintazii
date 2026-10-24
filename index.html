@@ -20,7 +20,7 @@
 
 <!-- Главная: список презентаций -->
 <div id="home" class="home" hidden>
-  <div class="home-top"><button id="btnCreate" class="create">Создать презентацию +</button></div>
+  <div class="home-top"><button id="btnCreate" class="create">Создать презентацию +</button><button id="btnOpenFile" class="open-file">📂 Открыть файл</button><input type="file" id="fileOpen" accept=".json,application/json" hidden></div>
   <div id="grid" class="grid"></div>
 </div>
 
@@ -134,6 +134,7 @@
   <div class="viewer-top">
     <span id="viewerTitle" class="viewer-title"></span>
     <button id="btnSaveCopy" class="btn">Сохранить себе</button>
+    <button id="btnCloseViewer" class="x" aria-label="Закрыть">✕</button>
   </div>
   <div class="viewer-wrap" id="viewerWrap">
     <div class="stage-box" id="viewerBox"><div class="stage" id="viewerStage"></div></div>
@@ -153,6 +154,7 @@
     <textarea id="shareLink" readonly rows="4"></textarea>
     <p id="shareInfo" class="hint"></p>
     <div class="name-btns">
+      <button id="shareFile" class="primary">Отправить файлом</button>
       <button id="shareClose">Закрыть</button>
       <button id="shareCopy" class="primary">Копировать</button>
       <button id="shareSend" class="primary">Отправить</button>

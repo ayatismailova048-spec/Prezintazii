@@ -480,19 +480,37 @@ async function makeShareLink(p) {
   const bytes = await pipe(new TextEncoder().encode(JSON.stringify({ t: p.title, s: slides })), new CompressionStream('deflate-raw'));
   return location.href.split('#')[0] + '#v1=' + toB64(bytes);
 }
+// всё, что пришло извне (ссылка, файл), приводим к безопасному виду
+function cleanPres(title, slidesRaw) {
+  if (!Array.isArray(slidesRaw) || !slidesRaw.length) throw 0;
+  const num = (v, d) => { v = Number(v); return isFinite(v) ? v : d; };
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const color = v => /^#[0-9a-f]{6}$/i.test(v) ? v : '#000000';
+  const TYPES = ['text', 'image', 'shape', 'rect', 'ellipse'];
+  return { id: uid(), title: String(title || 'Без названия').slice(0, 60), updated: Date.now(),
+    slides: slidesRaw.slice(0, 200).map(s => ({
+      id: uid(), bg: color((s && s.bg) || '#ffffff'),
+      els: ((s && s.els) || []).slice(0, 500).filter(e => e && TYPES.includes(e.type)).map(e => {
+        const c = { id: uid(), type: e.type, x: num(e.x, 0), y: num(e.y, 0), w: clamp(num(e.w, 100), 1, 5000), h: clamp(num(e.h, 50), 1, 5000), rot: clamp(num(e.rot, 0), -360, 360) };
+        if (e.type === 'text') Object.assign(c, { text: String(e.text || '').slice(0, 5000), size: clamp(num(e.size, 32), 8, 300), font: String(e.font || 'Roboto').replace(/[^\wа-яА-ЯёЁ \-]/g, '').slice(0, 40) || 'Roboto', bold: !!e.bold, italic: !!e.italic, underline: !!e.underline, align: ['left', 'center', 'right'].includes(e.align) ? e.align : 'left', color: color(e.color) });
+        else if (e.type === 'image') c.src = /^(data:image\/|https:\/\/)/.test(String(e.src)) ? String(e.src) : '';
+        else if (e.type === 'shape') Object.assign(c, { kind: SHAPES[e.kind] ? e.kind : 'rect', color: color(e.color), sw: clamp(num(e.sw, 8), 1, 60) });
+        else c.fill = color(e.fill);
+        return c;
+      })
+    })) };
+}
 async function readShareLink(hash) {
   const bytes = await pipe(fromB64(hash.slice(4)), new DecompressionStream('deflate-raw'));
   const d = JSON.parse(new TextDecoder().decode(bytes));
-  if (!d || !Array.isArray(d.s) || !d.s.length) throw 0;
-  return { id: uid(), title: d.t || 'Без названия', updated: Date.now(),
-    slides: d.s.map(s => ({ id: uid(), bg: s.bg || '#ffffff', els: (s.els || []).map(e => ({ ...e, id: uid() })) })) };
+  return cleanPres(d && d.t, d && d.s);
 }
 async function copyLinkFor(p) { // ссылка на презентацию: копируется одним нажатием на 🔗 у названия
   if (typeof CompressionStream === 'undefined') return toast('Этот браузер не умеет делать ссылки. Обновите Chrome.');
   toast('Готовим ссылку…');
   let link;
   try { link = await makeShareLink(p); } catch (e) { return toast('Не получилось сделать ссылку'); }
-  if (link.length > MAX_LINK) return toast('Презентация слишком большая для ссылки (много фото). Ссылка не скопирована. Уберите фото или сократите презентацию.');
+  if (link.length > MAX_LINK) return toast('Презентация слишком большая для ссылки (много фото). Ссылка не скопирована. Нажмите «Поделиться» внутри презентации и выберите «Отправить файлом».');
   try { await navigator.clipboard.writeText(link); toast('Ссылка скопирована. Её можно отправить: по ней презентацию можно только смотреть.'); }
   catch (e) { // если браузер не дал скопировать сам, показываем ссылку для ручного копирования
     $('#shareLink').value = link; $('#shareInfo').textContent = 'Выделите ссылку и скопируйте её.';
@@ -511,13 +529,28 @@ $('#btnShare').onclick = async () => {
     const link = await makeShareLink(state);
     if (link.length > MAX_LINK) {
       box.value = ''; $('#shareCopy').hidden = true; $('#shareSend').hidden = true;
-      $('#shareInfo').textContent = 'Презентация слишком большая для ссылки: ' + link.length + ' знаков, а можно до ' + MAX_LINK + '. Обычно мешают фото. Уберите часть фото или сократите презентацию, и ссылка получится.';
+      $('#shareInfo').textContent = 'Презентация слишком большая для ссылки: ' + link.length + ' знаков, а можно до ' + MAX_LINK + '. Обычно мешают фото. Нажмите «Отправить файлом»: получатель откроет файл в приложении.';
     } else {
       box.value = link; $('#shareCopy').hidden = false; $('#shareSend').hidden = !navigator.share;
       $('#shareInfo').textContent = 'Ссылка готова. Нажмите «Копировать» и отправьте её.';
     }
   } catch (e) { box.value = ''; $('#shareInfo').textContent = 'Не получилось сделать ссылку.'; }
 };
+async function sendFile(p) { // презентация целиком (с фото в хорошем качестве) одним файлом
+  const blob = new Blob([JSON.stringify({ app: 'prezintazii', v: 1, title: p.title, slides: p.slides })], { type: 'application/json' });
+  const name = (p.title || 'presentation').replace(/[\\/:*?"<>|]+/g, '_') + '.json';
+  const file = new File([blob], name, { type: 'application/json' });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: p.title }); return; }
+    catch (e) { if (e.name === 'AbortError') return; }
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  toast('Файл сохранён в «Загрузки». Отправьте его из файлового менеджера.');
+}
+$('#shareFile').onclick = () => sendFile(state);
 $('#shareClose').onclick = () => { $('#shareModal').hidden = true; };
 $('#shareCopy').onclick = async () => {
   const box = $('#shareLink');
@@ -543,12 +576,28 @@ function showViewer() {
 async function openShared() {
   try { shared = await readShareLink(location.hash); }
   catch (e) { toast('Эта ссылка не открывается'); history.replaceState(null, '', location.href.split('#')[0]); return showHome(); }
+  showSharedPres();
+}
+function showSharedPres() {
   vi = 0;
   document.title = shared.title;
   $('#viewerTitle').textContent = shared.title;
   $('#home').hidden = true; $('#editor').hidden = true; $('#viewer').hidden = false;
   showViewer();
 }
+$('#btnCloseViewer').onclick = () => { shared = null; history.replaceState(null, '', location.href.split('#')[0]); $('#viewer').hidden = true; showHome(); };
+$('#btnOpenFile').onclick = () => $('#fileOpen').click();
+$('#fileOpen').onchange = ev => {
+  const f = ev.target.files[0]; ev.target.value = '';
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try { const d = JSON.parse(r.result); shared = cleanPres(d.title, d.slides); }
+    catch (e) { return toast('Это не файл презентации'); }
+    showSharedPres();
+  };
+  r.readAsText(f);
+};
 $('#vPrev').onclick = () => { if (vi > 0) { vi--; showViewer(); } };
 $('#vNext').onclick = () => { if (vi < shared.slides.length - 1) { vi++; showViewer(); } };
 $('#btnSaveCopy').onclick = () => {
