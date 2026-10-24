@@ -24,7 +24,7 @@
       <div class="row">
         <button id="btnHome" class="x" aria-label="Закрыть презентацию">✕</button>
         <button id="btnText" class="btn">Текст +</button>
-        <button id="btnPhoto" class="btn">Вставить фото</button>
+        <label id="btnPhoto" class="btn">Вставить фото<input type="file" id="fileImage" accept="image/*"></label>
       </div>
       <div class="row">
         <button id="btnColor" class="swatch-btn" aria-label="Выбрать цвет"><span id="swatch"></span></button>
@@ -84,7 +84,6 @@
     <div id="thumbs"></div>
     <button id="btnPresent" class="play" aria-label="Показ">▶</button>
   </div>
-  <input type="file" id="fileImage" accept="image/*" hidden>
 </div>
 
 <!-- Выбор цвета -->

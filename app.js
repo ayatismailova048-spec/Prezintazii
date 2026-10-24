@@ -60,7 +60,7 @@ function styleText(d, e) {
 }
 function buildEl(e, editable) {
   const d = document.createElement('div');
-  d.className = 'el ' + e.type;
+  d.className = 'el ' + (e.type === 'shape' ? 'shapeel' : e.type);
   d.dataset.id = e.id;
   d.style.left = e.x + 'px'; d.style.top = e.y + 'px'; d.style.width = e.w + 'px';
   if (e.type === 'text') d.style.minHeight = e.h + 'px'; else d.style.height = e.h + 'px';
@@ -80,6 +80,7 @@ function buildEl(e, editable) {
   if (editable && e.id === sel) {
     d.classList.add('selected');
     const h = document.createElement('div'); h.className = 'handle'; d.appendChild(h);
+    const x = document.createElement('div'); x.className = 'del'; x.textContent = '✕'; d.appendChild(x);
   }
   return d;
 }
@@ -147,7 +148,7 @@ function startEdit(id, selectAll) {
   const n = stageEl.querySelector(`[data-id="${id}"]`);
   if (!n) return;
   editingId = id;
-  const h = n.querySelector('.handle'); if (h) h.remove();
+  n.querySelectorAll('.handle, .del').forEach(x => x.remove());
   n.contentEditable = 'true';
   n.classList.add('edit');
   n.focus();
@@ -169,6 +170,7 @@ function startEdit(id, selectAll) {
 stageEl.addEventListener('pointerdown', ev => {
   if (ev.target.isContentEditable) return;
   const hit = ev.target.closest('.el');
+  if (ev.target.classList.contains('del')) { sel = hit.dataset.id; delEl(); ev.preventDefault(); return; }
   blurEditing();
   if (!hit) { if (sel) { sel = null; render(); } return; }
   const id = hit.dataset.id;
@@ -226,8 +228,8 @@ function addImage(src) {
   img.onerror = () => toast('Не удалось открыть картинку');
   img.src = src;
 }
-$('#btnPhoto').onclick = () => $('#fileImage').click(); // на телефоне открывает галерею
-$('#fileImage').onchange = ev => {
+$('#fileImage').onchange = ev => { // input лежит прямо в кнопке: на телефоне открывает галерею
+  blurEditing();
   const f = ev.target.files[0]; ev.target.value = '';
   if (!f) return;
   const r = new FileReader();
