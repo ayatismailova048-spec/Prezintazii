@@ -1,5 +1,5 @@
 (() => {
-const W = 960, H = 540;
+const W = 960, H = 640;
 const KEY = 'prezintazii.v2';
 const OLD_KEY = 'prezintazii.v1';
 const $ = s => document.querySelector(s);
@@ -7,23 +7,13 @@ const uid = () => Math.random().toString(36).slice(2, 10);
 
 let lib = loadLib();   // { pres: [презентации] }
 let state = null;      // открытая презентация
-let cur = 0;          // current slide index
-let sel = null;       // selected element id
+let cur = 0;           // текущий слайд
+let sel = null;        // id выбранного элемента
+let editingId = null;  // id текста, который сейчас печатается
 
-function fresh() {
-  return { id: uid(), title: 'Без названия', slides: [newSlide(true)], updated: Date.now() };
-}
-function newSlide(withTitle) {
-  const s = { id: uid(), bg: '#ffffff', els: [] };
-  if (withTitle) {
-    s.els.push(mkText('Заголовок презентации', 80, 180, 800, 90, 54, true, 'center'));
-    s.els.push(mkText('Подзаголовок', 80, 290, 800, 50, 28, false, 'center'));
-  }
-  return s;
-}
-function mkText(text, x, y, w, h, size, bold, align) {
-  return { id: uid(), type: 'text', x, y, w, h, text, size, bold: !!bold, italic: false, underline: false, align: align || 'left', color: '#222222' };
-}
+/* ---------- данные ---------- */
+function newSlide() { return { id: uid(), bg: '#ffffff', els: [] }; }
+function fresh(title) { return { id: uid(), title: title || 'Без названия', slides: [newSlide()], updated: Date.now() }; }
 function loadLib() {
   try {
     const d = JSON.parse(localStorage.getItem(KEY));
@@ -41,32 +31,51 @@ function save() {
   clearTimeout(saveT);
   saveT = setTimeout(() => {
     try { localStorage.setItem(KEY, JSON.stringify(lib)); }
-    catch (e) { alert('Не удалось сохранить в браузере (слишком много картинок?). Используйте кнопку «Сохранить» для файла.'); }
+    catch (e) { toast('Не удалось сохранить: слишком много картинок'); }
   }, 200);
 }
+let toastT;
+function toast(m) { const t = $('#toast'); t.textContent = m; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 3500); }
 
 const slide = () => state.slides[cur];
-const selEl = () => slide().els.find(e => e.id === sel);
+const selEl = () => state && slide().els.find(e => e.id === sel);
 
-/* ---------- rendering ---------- */
+/* ---------- отрисовка элементов ---------- */
+const SHAPES = {
+  line:   { w: 320, h: 40,  svg: '<line class="shp" x1="2" y1="50" x2="98" y2="50"/>' },
+  arrow:  { w: 320, h: 90,  svg: '<line class="shp" x1="2" y1="50" x2="96" y2="50"/><polyline class="shp" points="68,18 98,50 68,82"/>' },
+  square: { w: 220, h: 220, svg: '<rect class="shp" x="3" y="3" width="94" height="94"/>' },
+  circle: { w: 220, h: 220, svg: '<ellipse class="shp" cx="50" cy="50" rx="47" ry="47"/>' },
+  rect:   { w: 300, h: 170, svg: '<rect class="shp solid" x="0" y="0" width="100" height="100" rx="8" ry="14"/>' },
+  dot:    { w: 60,  h: 60,  svg: '<ellipse class="shp solid" cx="50" cy="50" rx="50" ry="50"/>' },
+};
+function styleText(d, e) {
+  d.style.fontSize = e.size + 'px';
+  d.style.fontFamily = `"${e.font || 'Roboto'}", sans-serif`;
+  d.style.fontWeight = e.bold ? '700' : '400';
+  d.style.fontStyle = e.italic ? 'italic' : 'normal';
+  d.style.textDecoration = e.underline ? 'underline' : 'none';
+  d.style.textAlign = e.align || 'left';
+  d.style.color = e.color;
+}
 function buildEl(e, editable) {
   const d = document.createElement('div');
   d.className = 'el ' + e.type;
   d.dataset.id = e.id;
-  d.style.cssText += `left:${e.x}px;top:${e.y}px;width:${e.w}px;height:${e.h}px;`;
+  d.style.left = e.x + 'px'; d.style.top = e.y + 'px'; d.style.width = e.w + 'px';
+  if (e.type === 'text') d.style.minHeight = e.h + 'px'; else d.style.height = e.h + 'px';
+  if (e.rot) d.style.transform = `rotate(${e.rot}deg)`;
   if (e.type === 'text') {
     d.textContent = e.text;
-    d.style.fontSize = e.size + 'px';
-    d.style.fontWeight = e.bold ? '700' : '400';
-    d.style.fontStyle = e.italic ? 'italic' : 'normal';
-    d.style.textDecoration = e.underline ? 'underline' : 'none';
-    d.style.textAlign = e.align;
-    d.style.color = e.color;
-    d.style.whiteSpace = 'pre-wrap';
+    styleText(d, e);
   } else if (e.type === 'image') {
     const img = document.createElement('img'); img.src = e.src; d.appendChild(img);
+  } else if (e.type === 'shape') {
+    d.style.color = e.color;
+    d.innerHTML = `<svg viewBox="0 0 100 100" preserveAspectRatio="none" style="--sw:${e.sw || 8}px">${SHAPES[e.kind].svg}</svg>`;
+    d.querySelectorAll('.shp').forEach(n => n.style.strokeWidth = (e.sw || 8) + 'px');
   } else {
-    d.style.background = e.fill;
+    d.style.background = e.fill; // rect / ellipse из прошлых версий
   }
   if (editable && e.id === sel) {
     d.classList.add('selected');
@@ -79,14 +88,26 @@ function fillStage(stage, s, editable) {
   stage.style.background = s.bg;
   s.els.forEach(e => stage.appendChild(buildEl(e, editable)));
 }
+
+/* ---------- экран редактора ---------- */
+const stageEl = $('#stage');
 function render() {
-  const stage = $('#stage');
-  stage.classList.add('editing');
-  fillStage(stage, slide(), true);
+  fillStage(stageEl, slide(), true);
   fit();
   renderThumbs();
-  syncToolbar();
+  syncUI();
 }
+function fit() {
+  const wrap = $('#stageWrap');
+  const k = Math.min((wrap.clientWidth - 16) / W, (wrap.clientHeight - 16) / H);
+  if (!(k > 0)) return;
+  $('#stageBox').style.width = W * k + 'px';
+  $('#stageBox').style.height = H * k + 'px';
+  stageEl.style.transform = `scale(${k})`;
+}
+new ResizeObserver(() => { if (state) fit(); }).observe($('#stageWrap'));
+addEventListener('resize', () => { if (state) renderThumbs(); else renderHome(); });
+
 function renderThumbs() {
   const box = $('#thumbs');
   box.innerHTML = '';
@@ -96,99 +117,123 @@ function renderThumbs() {
     t.innerHTML = `<span class="num">${i + 1}</span>`;
     const mini = document.createElement('div');
     mini.className = 'stage mini';
-    mini.style.boxShadow = 'none';
-    const k = (t.style.width ? parseFloat(t.style.width) : (innerWidth <= 700 ? 86 : 176)) / W;
-    mini.style.transform = `scale(${k})`;
-    mini.style.transformOrigin = '0 0';
-    mini.style.position = 'absolute';
+    mini.style.transform = `scale(${90 / W})`;
     fillStage(mini, s, false);
     t.appendChild(mini);
-    t.onclick = () => { cur = i; sel = null; render(); };
+    t.onclick = () => { blurEditing(); cur = i; sel = null; render(); };
     box.appendChild(t);
+    if (i === cur) t.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   });
 }
-function fit() {
-  const wrap = $('#stageWrap'), stage = $('#stage');
-  const k = Math.min((wrap.clientWidth - 40) / W, (wrap.clientHeight - 40) / H, 1.6);
-  stage.style.transform = `scale(${k})`;
-  stage.style.margin = `${(H * k - H) / 2}px ${(W * k - W) / 2}px`;
-}
-function syncToolbar() {
-  $('#bgColor').value = slide().bg;
+function elColor(e) { return e.type === 'text' || e.type === 'shape' ? e.color : e.type === 'image' ? null : e.fill; }
+function syncUI() {
   const e = selEl();
+  $('#ctx').hidden = !e;
+  $('#ctx').classList.toggle('no-text', !e || e.type !== 'text');
+  $('#ctx').classList.toggle('no-shape', !e || e.type !== 'shape');
+  $('#swatch').style.background = (e && elColor(e)) || slide().bg;
   if (!e) return;
-  if (e.type === 'text') { $('#fontSize').value = e.size; $('#textColor').value = e.color; }
-  else if (e.fill) $('#fillColor').value = e.fill;
+  if (e.type === 'text') { $('#font').value = e.font || 'Roboto'; $('#fontSize').value = e.size; }
+  if (e.type === 'shape') $('#sw').value = e.sw || 8;
+  $('#rot').value = e.rot || 0;
 }
-addEventListener('resize', () => { if (state) { fit(); renderThumbs(); } else renderHome(); });
 
-/* ---------- mouse interaction ---------- */
-const stageEl = $('#stage');
-stageEl.addEventListener('mousedown', ev => {
-  if (ev.target.isContentEditable) return;
-  const node = ev.target.closest('.el');
-  if (!node) { sel = null; render(); return; }
-  const e = slide().els.find(x => x.id === node.dataset.id);
-  if (sel !== e.id) { sel = e.id; render(); }
-  const k = stageEl.getBoundingClientRect().width / W;
-  const resizing = ev.target.classList.contains('handle');
-  const sx = ev.clientX, sy = ev.clientY, ox = e.x, oy = e.y, ow = e.w, oh = e.h;
-  const cn = () => stageEl.querySelector(`[data-id="${e.id}"]`);
-  const move = m => {
-    const dx = (m.clientX - sx) / k, dy = (m.clientY - sy) / k;
-    if (resizing) { e.w = Math.max(30, Math.round(ow + dx)); e.h = Math.max(20, Math.round(oh + dy)); }
-    else { e.x = Math.round(ox + dx); e.y = Math.round(oy + dy); }
-    const n = cn();
-    n.style.left = e.x + 'px'; n.style.top = e.y + 'px'; n.style.width = e.w + 'px'; n.style.height = e.h + 'px';
-  };
-  const up = () => { removeEventListener('mousemove', move); removeEventListener('mouseup', up); renderThumbs(); save(); };
-  addEventListener('mousemove', move);
-  addEventListener('mouseup', up);
-  ev.preventDefault();
-});
-stageEl.addEventListener('dblclick', ev => {
-  const node = ev.target.closest('.el.text');
-  if (!node) return;
-  node.contentEditable = 'true';
-  node.focus();
-  const r = document.createRange(); r.selectNodeContents(node);
+/* ---------- перетаскивание, размер, правка текста ---------- */
+function blurEditing() {
+  const a = document.activeElement;
+  if (a && a.isContentEditable) a.blur();
+}
+function startEdit(id, selectAll) {
+  const n = stageEl.querySelector(`[data-id="${id}"]`);
+  if (!n) return;
+  editingId = id;
+  const h = n.querySelector('.handle'); if (h) h.remove();
+  n.contentEditable = 'true';
+  n.classList.add('edit');
+  n.focus();
+  const r = document.createRange();
+  r.selectNodeContents(n);
+  if (!selectAll) r.collapse(false);
   const s = getSelection(); s.removeAllRanges(); s.addRange(r);
-  node.onblur = () => {
-    const e = slide().els.find(x => x.id === node.dataset.id);
-    if (e) e.text = node.innerText.replace(/\n$/, '');
-    node.contentEditable = 'false';
+  n.onblur = () => {
+    editingId = null;
+    const e = state.slides[cur].els.find(x => x.id === id);
+    if (e) {
+      e.text = n.innerText.replace(/\n$/, '');
+      if (!e.text.trim()) { slide().els = slide().els.filter(x => x !== e); sel = null; }
+    }
+    n.contentEditable = 'false';
     save(); render();
   };
+}
+stageEl.addEventListener('pointerdown', ev => {
+  if (ev.target.isContentEditable) return;
+  const hit = ev.target.closest('.el');
+  blurEditing();
+  if (!hit) { if (sel) { sel = null; render(); } return; }
+  const id = hit.dataset.id;
+  const e = slide().els.find(x => x.id === id);
+  const wasSel = sel === id;
+  if (!wasSel) { sel = id; render(); }
+  const resizing = ev.target.classList.contains('handle');
+  const k = stageEl.getBoundingClientRect().width / W;
+  const sx = ev.clientX, sy = ev.clientY, ox = e.x, oy = e.y, ow = e.w, oh = e.h;
+  let moved = false;
+  const node = () => stageEl.querySelector(`[data-id="${id}"]`);
+  const move = m => {
+    const dx = (m.clientX - sx) / k, dy = (m.clientY - sy) / k;
+    if (Math.abs(dx) + Math.abs(dy) > 4) moved = true;
+    if (!moved) return;
+    const n = node();
+    if (resizing) {
+      e.w = Math.max(30, Math.round(ow + dx)); e.h = Math.max(20, Math.round(oh + dy));
+      n.style.width = e.w + 'px';
+      if (e.type === 'text') n.style.minHeight = e.h + 'px'; else n.style.height = e.h + 'px';
+    } else {
+      e.x = Math.round(ox + dx); e.y = Math.round(oy + dy);
+      n.style.left = e.x + 'px'; n.style.top = e.y + 'px';
+    }
+  };
+  const up = () => {
+    removeEventListener('pointermove', move); removeEventListener('pointerup', up); removeEventListener('pointercancel', up);
+    if (moved) { renderThumbs(); save(); }
+    else if (wasSel && !resizing && e.type === 'text') startEdit(id, false);
+  };
+  addEventListener('pointermove', move);
+  addEventListener('pointerup', up);
+  addEventListener('pointercancel', up);
+  ev.preventDefault();
 });
 
-/* ---------- element actions ---------- */
-function addEl(e) { slide().els.push(e); sel = e.id; save(); render(); }
-document.querySelectorAll('[data-add]').forEach(b => b.onclick = () => {
-  const t = b.dataset.add;
-  if (t === 'text') addEl(mkText('Текст', 100, 120, 400, 60, 32));
-  else if (t === 'title') addEl(mkText('Заголовок', 60, 40, 840, 80, 48, true));
-  else addEl({ id: uid(), type: t, x: 300, y: 180, w: 220, h: t === 'ellipse' ? 220 : 140, fill: $('#fillColor').value });
+/* ---------- добавление ---------- */
+function addEl(e) { blurEditing(); slide().els.push(e); sel = e.id; save(); render(); }
+$('#btnText').onclick = () => {
+  const e = { id: uid(), type: 'text', x: 200, y: 260, w: 560, h: 70, text: 'Текст', size: 44, font: 'Roboto', bold: false, italic: false, underline: false, align: 'left', color: '#000000' };
+  addEl(e);
+  startEdit(e.id, true); // открывается клавиатура
+};
+document.querySelectorAll('[data-shape]').forEach(b => b.onclick = () => {
+  const kind = b.dataset.shape, s = SHAPES[kind];
+  addEl({ id: uid(), type: 'shape', kind, x: Math.round((W - s.w) / 2), y: Math.round((H - s.h) / 2), w: s.w, h: s.h, color: $('#swatch').dataset.last || '#000000', sw: 8, rot: 0 });
 });
-
 function addImage(src) {
   const img = new Image();
   img.onload = () => {
-    let w = img.naturalWidth, h = img.naturalHeight;
-    const k = Math.min(1, 500 / w, 380 / h);
-    addEl({ id: uid(), type: 'image', x: 100, y: 80, w: Math.round(w * k), h: Math.round(h * k), src });
+    const k = Math.min(1, 640 / img.naturalWidth, 460 / img.naturalHeight);
+    const w = Math.round(img.naturalWidth * k), h = Math.round(img.naturalHeight * k);
+    addEl({ id: uid(), type: 'image', x: Math.round((W - w) / 2), y: Math.round((H - h) / 2), w, h, src });
   };
-  img.onerror = () => alert('Не удалось загрузить картинку');
+  img.onerror = () => toast('Не удалось открыть картинку');
   img.src = src;
 }
-$('#btnImage').onclick = () => $('#fileImage').click();
+$('#btnPhoto').onclick = () => $('#fileImage').click(); // на телефоне открывает галерею
 $('#fileImage').onchange = ev => {
   const f = ev.target.files[0]; ev.target.value = '';
   if (!f) return;
   const r = new FileReader();
   r.onload = () => {
-    // уменьшаем большие картинки, чтобы влезли в хранилище браузера
     const im = new Image();
-    im.onload = () => {
+    im.onload = () => { // уменьшаем большие фото, чтобы хватило места в браузере
       const k = Math.min(1, 1280 / im.naturalWidth, 1280 / im.naturalHeight);
       if (k === 1 && f.size < 400000) return addImage(r.result);
       const c = document.createElement('canvas');
@@ -196,122 +241,138 @@ $('#fileImage').onchange = ev => {
       c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
       addImage(c.toDataURL(f.type === 'image/png' ? 'image/png' : 'image/jpeg', 0.85));
     };
+    im.onerror = () => toast('Не удалось открыть картинку');
     im.src = r.result;
   };
   r.readAsDataURL(f);
 };
-$('#btnImageUrl').onclick = () => { const u = prompt('Ссылка на картинку:'); if (u) addImage(u.trim()); };
 
-function patch(fn) { const e = selEl(); if (!e) return; fn(e); save(); render(); }
-document.querySelectorAll('[data-cmd]').forEach(b => b.onclick = () => patch(e => {
-  const p = { bold: 'bold', italic: 'italic', underline: 'underline' }[b.dataset.cmd];
-  if (e.type === 'text') e[p] = !e[p];
-}));
-document.querySelectorAll('[data-align]').forEach(b => b.onclick = () => patch(e => { if (e.type === 'text') e.align = b.dataset.align; }));
-$('#fontSize').oninput = ev => patch(e => { if (e.type === 'text') e.size = Math.max(8, +ev.target.value || 8); });
-$('#textColor').oninput = ev => patch(e => { if (e.type === 'text') e.color = ev.target.value; });
-$('#fillColor').oninput = ev => patch(e => { if (e.type === 'rect' || e.type === 'ellipse') e.fill = ev.target.value; });
-$('#bgColor').oninput = ev => { slide().bg = ev.target.value; save(); render(); };
+/* ---------- панель выбранного элемента ---------- */
+function patch(fn) {
+  const e = selEl(); if (!e) return;
+  fn(e); save();
+  const n = stageEl.querySelector(`[data-id="${e.id}"]`);
+  if (n && n.isContentEditable) { styleText(n, e); renderThumbs(); } else render();
+}
+document.querySelectorAll('.ctx button').forEach(b => b.addEventListener('pointerdown', ev => ev.preventDefault())); // не терять фокус при печати
+document.querySelectorAll('[data-fmt]').forEach(b => b.onclick = () => patch(e => { e[b.dataset.fmt] = !e[b.dataset.fmt]; }));
+document.querySelectorAll('[data-align]').forEach(b => b.onclick = () => patch(e => { e.align = b.dataset.align; }));
+$('#font').onchange = ev => patch(e => { e.font = ev.target.value; });
+$('#fontSize').oninput = ev => { const v = +ev.target.value; if (v >= 8) patch(e => { e.size = Math.min(300, v); }); };
+$('#szMinus').onclick = () => patch(e => { e.size = Math.max(8, e.size - 2); $('#fontSize').value = e.size; });
+$('#szPlus').onclick = () => patch(e => { e.size = Math.min(300, e.size + 2); $('#fontSize').value = e.size; });
+$('#sw').oninput = ev => patch(e => { e.sw = +ev.target.value; });
+$('#rot').oninput = ev => patch(e => { e.rot = +ev.target.value; });
 $('#btnFront').onclick = () => { const a = slide().els, i = a.findIndex(e => e.id === sel); if (i >= 0) { a.push(a.splice(i, 1)[0]); save(); render(); } };
 $('#btnBack').onclick = () => { const a = slide().els, i = a.findIndex(e => e.id === sel); if (i >= 0) { a.unshift(a.splice(i, 1)[0]); save(); render(); } };
 function delEl() { const a = slide().els, i = a.findIndex(e => e.id === sel); if (i >= 0) { a.splice(i, 1); sel = null; save(); render(); } }
 $('#btnDelEl').onclick = delEl;
 
-/* ---------- slides ---------- */
-$('#btnAddSlide').onclick = () => { state.slides.splice(cur + 1, 0, newSlide(false)); cur++; sel = null; save(); render(); };
+/* ---------- слайды ---------- */
+$('#btnAddSlide').onclick = () => { blurEditing(); state.slides.splice(cur + 1, 0, newSlide()); cur++; sel = null; save(); render(); };
 $('#btnDupSlide').onclick = () => {
+  blurEditing();
   const c = JSON.parse(JSON.stringify(slide()));
   c.id = uid(); c.els.forEach(e => e.id = uid());
   state.slides.splice(cur + 1, 0, c); cur++; sel = null; save(); render();
 };
 $('#btnDelSlide').onclick = () => {
-  if (state.slides.length === 1) { state.slides[0] = newSlide(false); }
+  blurEditing();
+  if (state.slides.length === 1) state.slides[0] = newSlide();
   else { state.slides.splice(cur, 1); cur = Math.min(cur, state.slides.length - 1); }
   sel = null; save(); render();
 };
 
-/* ---------- file / title ---------- */
-$('#btnExport').onclick = () => {
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([JSON.stringify(state)], { type: 'application/json' }));
-  a.download = (state.title || 'presentation') + '.json';
-  a.click(); URL.revokeObjectURL(a.href);
-};
-$('#btnImport').onclick = () => $('#fileImport').click();
-$('#fileImport').onchange = ev => {
-  const f = ev.target.files[0]; ev.target.value = '';
-  if (!f) return;
-  const r = new FileReader();
-  r.onload = () => {
-    try {
-      const d = JSON.parse(r.result);
-      if (!d.slides || !d.slides.length) throw 0;
-      Object.assign(state, { title: d.title || state.title, slides: d.slides }); cur = 0; sel = null; $('#title').value = state.title; save(); render();
-    } catch (e) { alert('Неверный файл презентации'); }
-  };
-  r.readAsText(f);
-};
-$('#btnPrint').onclick = () => {
-  const pa = $('#printArea');
-  pa.innerHTML = '';
-  state.slides.forEach(s => { const st = document.createElement('div'); st.className = 'stage'; fillStage(st, s, false); pa.appendChild(st); });
-  print();
-};
-
-/* ---------- presenter ---------- */
-let pi = 0;
-function showPres() {
-  const ps = $('#presStage');
-  fillStage(ps, state.slides[pi], false);
-  const k = Math.min(innerWidth / W, innerHeight / H);
-  ps.style.transform = `scale(${k})`;
+/* ---------- выбор цвета ---------- */
+const hsv = { h: 0, s: 1, v: 1 };
+function hsv2hex({ h, s, v }) {
+  const f = n => { const k = (n + h / 60) % 6; return v - v * s * Math.max(0, Math.min(k, 4 - k, 1)); };
+  return '#' + [f(5), f(3), f(1)].map(x => Math.round(x * 255).toString(16).padStart(2, '0')).join('');
 }
-$('#btnPresent').onclick = () => {
-  pi = cur; $('#presenter').hidden = false; showPres();
-  if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
-};
-function endPres() {
-  $('#presenter').hidden = true;
-  if (document.fullscreenElement) document.exitFullscreen();
+function hex2hsv(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = (n >> 16 & 255) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+  let h = 0;
+  if (d) h = mx === r ? ((g - b) / d + 6) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return { h: h * 60, s: mx ? d / mx : 0, v: mx };
 }
-$('#presenter').addEventListener('click', () => { if (pi < state.slides.length - 1) { pi++; showPres(); } else endPres(); });
-addEventListener('resize', () => { if (!$('#presenter').hidden) showPres(); });
-
-addEventListener('keydown', ev => {
-  if (!$('#presenter').hidden) {
-    if (ev.key === 'Escape') endPres();
-    else if (['ArrowRight', 'ArrowDown', 'PageDown', ' '].includes(ev.key)) { if (pi < state.slides.length - 1) { pi++; showPres(); } }
-    else if (['ArrowLeft', 'ArrowUp', 'PageUp'].includes(ev.key)) { if (pi > 0) { pi--; showPres(); } }
-    return;
-  }
-  const t = ev.target;
-  if (!state) return;
-  if (t.isContentEditable || /INPUT|TEXTAREA/.test(t.tagName)) return;
-  if ((ev.key === 'Delete' || ev.key === 'Backspace') && sel) { delEl(); ev.preventDefault(); }
+function targetColor() { const e = selEl(); return (e && elColor(e)) || slide().bg; }
+function applyColor(hex) {
   const e = selEl();
-  if (e && ev.key.startsWith('Arrow')) {
-    const d = ev.shiftKey ? 10 : 1;
-    if (ev.key === 'ArrowLeft') e.x -= d; if (ev.key === 'ArrowRight') e.x += d;
-    if (ev.key === 'ArrowUp') e.y -= d; if (ev.key === 'ArrowDown') e.y += d;
-    save(); render(); ev.preventDefault();
+  if (!e) slide().bg = hex;
+  else if (e.type === 'text' || e.type === 'shape') e.color = hex;
+  else if (e.type !== 'image') e.fill = hex;
+  $('#swatch').dataset.last = hex;
+  save();
+  const n = e && stageEl.querySelector(`[data-id="${e.id}"]`);
+  if (n && n.isContentEditable) styleText(n, e);
+  else render();
+}
+function paintPicker() {
+  const wheel = $('#wheel'), R = wheel.clientWidth / 2;
+  $('#sv').style.setProperty('--h', `hsl(${hsv.h}, 100%, 50%)`);
+  const a = (hsv.h - 90) * Math.PI / 180, rr = R * 0.835;
+  const mh = $('#markH'); mh.style.left = R + Math.cos(a) * rr + 'px'; mh.style.top = R + Math.sin(a) * rr + 'px';
+  mh.style.background = `hsl(${hsv.h}, 100%, 50%)`;
+  const side = R * 2 * 0.46, lx = (hsv.s - 0.5) * side, ly = (0.5 - hsv.v) * side, c = Math.SQRT1_2;
+  const ms = $('#markSV'); ms.style.left = R + (lx * c - ly * c) + 'px'; ms.style.top = R + (lx * c + ly * c) + 'px';
+  const hex = hsv2hex(hsv);
+  ms.style.background = hex;
+  if (document.activeElement !== $('#hex')) $('#hex').value = hex;
+}
+function pick(ev) {
+  const wheel = $('#wheel'), b = wheel.getBoundingClientRect(), R = b.width / 2;
+  const dx = ev.clientX - b.left - R, dy = ev.clientY - b.top - R;
+  if (drag === 'h') hsv.h = (Math.atan2(dy, dx) * 180 / Math.PI + 90 + 360) % 360;
+  else {
+    const side = R * 2 * 0.46, c = Math.SQRT1_2;
+    const lx = dx * c + dy * c, ly = -dx * c + dy * c;
+    hsv.s = Math.max(0, Math.min(1, lx / side + 0.5));
+    hsv.v = Math.max(0, Math.min(1, 0.5 - ly / side));
   }
+  paintPicker(); applyColor(hsv2hex(hsv));
+}
+let drag = null;
+$('#wheel').addEventListener('pointerdown', ev => {
+  const b = $('#wheel').getBoundingClientRect(), R = b.width / 2;
+  const d = Math.hypot(ev.clientX - b.left - R, ev.clientY - b.top - R) / R;
+  drag = d > 0.62 ? 'h' : 'sv';
+  pick(ev); ev.preventDefault();
+  const mv = m => pick(m), up = () => { drag = null; removeEventListener('pointermove', mv); removeEventListener('pointerup', up); };
+  addEventListener('pointermove', mv); addEventListener('pointerup', up);
 });
+$('#hex').oninput = ev => {
+  let v = ev.target.value.trim(); if (v[0] !== '#') v = '#' + v;
+  if (/^#[0-9a-f]{6}$/i.test(v)) { Object.assign(hsv, hex2hsv(v)); paintPicker(); applyColor(v.toLowerCase()); }
+};
+['#000000', '#ffffff', '#e53935', '#fb8c00', '#fdd835', '#43a047', '#1e88e5', '#8e24aa'].forEach(c => {
+  const b = document.createElement('button'); b.style.background = c; b.setAttribute('aria-label', c);
+  b.onclick = () => { Object.assign(hsv, hex2hsv(c)); paintPicker(); applyColor(c); };
+  $('#presets').appendChild(b);
+});
+$('#btnColor').onclick = () => { // не трогаем выбор: красим выбранный элемент, а без выбора фон слайда
+  blurEditing();
+  Object.assign(hsv, hex2hsv(/^#[0-9a-f]{6}$/i.test(targetColor()) ? targetColor() : '#000000'));
+  $('#colorModal').hidden = false;
+  paintPicker();
+};
+$('#colorDone').onclick = () => { $('#colorModal').hidden = true; };
+$('#btnColor').addEventListener('pointerdown', ev => { if (editingId) ev.preventDefault(); });
 
-
-/* ---------- главная: список презентаций ---------- */
+/* ---------- главная ---------- */
 function showHome() {
+  blurEditing();
   state = null; sel = null;
   document.title = 'Презентации';
   $('#editor').hidden = true; $('#home').hidden = false;
   renderHome();
 }
-function openPres(p, isNew) {
+function openPres(p) {
   state = p; cur = 0; sel = null;
   $('#home').hidden = true; $('#editor').hidden = false;
-  $('#title').value = p.title;
   document.title = p.title || 'Презентации';
   render();
-  if (isNew) { $('#title').focus(); $('#title').select(); }
 }
 function renderHome() {
   const grid = $('#grid');
@@ -328,26 +389,90 @@ function renderHome() {
     name.textContent = p.title || 'Без названия';
     const prev = document.createElement('div');
     prev.className = 'card-prev';
+    const tools = document.createElement('div');
+    tools.className = 'card-tools';
+    const ren = document.createElement('button');
+    ren.textContent = '✎'; ren.title = 'Переименовать';
+    ren.onclick = ev => { ev.stopPropagation(); askName(p.title, v => { p.title = v; save(); renderHome(); }); };
     const del = document.createElement('button');
-    del.className = 'card-del'; del.title = 'Удалить'; del.textContent = '×';
+    del.textContent = '×'; del.title = 'Удалить';
     del.onclick = ev => {
       ev.stopPropagation();
-      if (del.dataset.armed) { lib.pres = lib.pres.filter(x => x !== p); save(); renderHome(); return; }
-      del.dataset.armed = '1'; del.textContent = 'Удалить?'; del.classList.add('armed');
-      setTimeout(() => { del.dataset.armed = ''; del.textContent = '×'; del.classList.remove('armed'); }, 3000);
+      if (del.classList.contains('armed')) { lib.pres = lib.pres.filter(x => x !== p); save(); renderHome(); return; }
+      del.classList.add('armed'); del.textContent = 'Удалить?';
+      setTimeout(() => { del.classList.remove('armed'); del.textContent = '×'; }, 3000);
     };
-    card.append(name, prev, del);
+    tools.append(ren, del);
+    card.append(name, prev, tools);
     card.onclick = () => openPres(p);
     grid.appendChild(card);
     const mini = document.createElement('div');
     mini.className = 'stage mini';
-    mini.style.cssText = `box-shadow:none;position:absolute;left:0;top:0;transform-origin:0 0;transform:scale(${prev.clientWidth / W})`;
+    mini.style.transform = `scale(${prev.clientWidth / W})`;
     fillStage(mini, p.slides[0], false);
     prev.appendChild(mini);
   });
 }
-$('#title').oninput = ev => { state.title = ev.target.value; document.title = state.title || 'Презентации'; save(); };
+let nameCb = null;
+function askName(initial, cb) {
+  nameCb = cb;
+  $('#nameInput').value = initial || '';
+  $('#nameModal').hidden = false;
+  $('#nameInput').focus(); $('#nameInput').select();
+}
+function nameDone() {
+  const v = $('#nameInput').value.trim() || 'Без названия';
+  $('#nameModal').hidden = true;
+  const cb = nameCb; nameCb = null;
+  if (cb) cb(v);
+}
+$('#nameOk').onclick = nameDone;
+$('#nameCancel').onclick = () => { $('#nameModal').hidden = true; nameCb = null; };
+$('#nameInput').onkeydown = ev => { if (ev.key === 'Enter') nameDone(); };
+$('#btnCreate').onclick = () => askName('', v => { const p = fresh(v); lib.pres.push(p); save(); openPres(p); });
 $('#btnHome').onclick = () => { save(); showHome(); };
-$('#btnCreate').onclick = () => { const p = fresh(); lib.pres.push(p); save(); openPres(p, true); };
+
+/* ---------- показ ---------- */
+let pi = 0;
+function showPres() {
+  const ps = $('#presStage');
+  fillStage(ps, state.slides[pi], false);
+  ps.style.transform = `scale(${Math.min(innerWidth / W, innerHeight / H)})`;
+}
+function nextPres() { if (pi < state.slides.length - 1) { pi++; showPres(); } else endPres(); }
+function prevPres() { if (pi > 0) { pi--; showPres(); } }
+function endPres() { $('#presenter').hidden = true; if (document.fullscreenElement) document.exitFullscreen(); }
+$('#btnPresent').onclick = () => {
+  blurEditing(); pi = cur; $('#presenter').hidden = false; showPres();
+  if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen().catch(() => {});
+};
+$('#presenter').addEventListener('click', ev => {
+  if (ev.target.id === 'presClose') return endPres();
+  ev.clientX < innerWidth / 3 ? prevPres() : nextPres();
+});
+addEventListener('resize', () => { if (!$('#presenter').hidden) showPres(); });
+
+addEventListener('keydown', ev => {
+  if (!$('#presenter').hidden) {
+    if (ev.key === 'Escape') endPres();
+    else if (['ArrowRight', 'ArrowDown', 'PageDown', ' '].includes(ev.key)) nextPres();
+    else if (['ArrowLeft', 'ArrowUp', 'PageUp'].includes(ev.key)) prevPres();
+    return;
+  }
+  if (!state) return;
+  const t = ev.target;
+  if (t.isContentEditable || /INPUT|TEXTAREA|SELECT/.test(t.tagName)) return;
+  if ((ev.key === 'Delete' || ev.key === 'Backspace') && sel) { delEl(); ev.preventDefault(); }
+  const e = selEl();
+  if (e && ev.key.startsWith('Arrow')) {
+    const d = ev.shiftKey ? 10 : 1;
+    if (ev.key === 'ArrowLeft') e.x -= d;
+    if (ev.key === 'ArrowRight') e.x += d;
+    if (ev.key === 'ArrowUp') e.y -= d;
+    if (ev.key === 'ArrowDown') e.y += d;
+    save(); render(); ev.preventDefault();
+  }
+});
+
 showHome();
 })();

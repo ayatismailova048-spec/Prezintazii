@@ -2,74 +2,129 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Презентации</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;700&family=Lobster&family=Oswald:wght@400;700&family=Pacifico&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Roboto:ital,wght@0,400;0,700;1,400&display=swap&subset=cyrillic">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
+<!-- Главная: список презентаций -->
 <div id="home" class="home" hidden>
   <div class="home-top"><button id="btnCreate" class="create">Создать презентацию +</button></div>
   <div id="grid" class="grid"></div>
 </div>
 
+<!-- Редактор -->
 <div id="editor" class="editor" hidden>
-<header class="topbar">
-  <button id="btnHome" title="К списку презентаций">← Мои презентации</button>
-  <input id="title" class="title" placeholder="Название презентации" spellcheck="false">
-  <div class="spacer"></div>
-  <button id="btnExport" title="Сохранить в файл">Сохранить</button>
-  <button id="btnImport" title="Открыть файл">Открыть</button>
-  <button id="btnPrint" title="Печать / PDF">PDF</button>
-  <button id="btnPresent" class="primary">▶ Показ</button>
-  <input type="file" id="fileImport" accept=".json" hidden>
-</header>
+  <div class="panel">
+    <div class="panel-left">
+      <div class="row">
+        <button id="btnHome" class="x" aria-label="Закрыть презентацию">✕</button>
+        <button id="btnText" class="btn">Текст +</button>
+        <button id="btnPhoto" class="btn">Вставить фото</button>
+      </div>
+      <div class="row">
+        <button id="btnColor" class="swatch-btn" aria-label="Выбрать цвет"><span id="swatch"></span></button>
+        <span class="lbl">Выбрать цвет</span>
+        <div class="slide-btns">
+          <button id="btnAddSlide" class="btn">Добавить слайд</button>
+          <button id="btnDupSlide" class="btn">Дублировать</button>
+          <button id="btnDelSlide" class="btn">Удалить слайд</button>
+        </div>
+      </div>
+    </div>
+    <div class="panel-right">
+      <div class="lbl center">Добавить</div>
+      <div class="shapes">
+        <button class="shape" data-shape="line" aria-label="Линия"><svg viewBox="0 0 24 24"><path d="M5 19L19 5"/></svg></button>
+        <button class="shape" data-shape="arrow" aria-label="Стрелка"><svg viewBox="0 0 24 24"><path d="M6 18L18 6M9 6h9v9"/></svg></button>
+        <button class="shape" data-shape="square" aria-label="Квадрат"><svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14"/></svg></button>
+        <button class="shape" data-shape="circle" aria-label="Круг"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg></button>
+        <button class="shape" data-shape="rect" aria-label="Прямоугольник"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="2"/></svg></button>
+        <button class="shape" data-shape="dot" aria-label="Точка"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" class="fill"/></svg></button>
+      </div>
+    </div>
+  </div>
 
-<div class="toolbar">
-  <button data-add="text">＋ Текст</button>
-  <button data-add="title">＋ Заголовок</button>
-  <button id="btnImage">🖼 Картинка</button>
-  <button id="btnImageUrl">🔗 Картинка по ссылке</button>
-  <button data-add="rect">▭ Прямоугольник</button>
-  <button data-add="ellipse">◯ Круг</button>
-  <span class="sep"></span>
-  <button data-cmd="bold"><b>B</b></button>
-  <button data-cmd="italic"><i>I</i></button>
-  <button data-cmd="underline"><u>U</u></button>
-  <button data-align="left" title="По левому краю">⇤</button>
-  <button data-align="center" title="По центру">↔</button>
-  <button data-align="right" title="По правому краю">⇥</button>
-  <label>Размер <input id="fontSize" type="number" min="8" max="200" value="32"></label>
-  <label>Цвет <input id="textColor" type="color" value="#222222"></label>
-  <label>Заливка <input id="fillColor" type="color" value="#4f8cff"></label>
-  <span class="sep"></span>
-  <label>Фон слайда <input id="bgColor" type="color" value="#ffffff"></label>
-  <button id="btnFront" title="На передний план">⬆</button>
-  <button id="btnBack" title="На задний план">⬇</button>
-  <button id="btnDelEl" title="Удалить элемент (Del)">🗑</button>
+  <div id="ctx" class="ctx" hidden>
+    <select id="font" class="only-text" aria-label="Шрифт">
+      <option value="Roboto">Roboto</option>
+      <option value="Playfair Display">Playfair</option>
+      <option value="Oswald">Oswald</option>
+      <option value="Caveat">Caveat</option>
+      <option value="Pacifico">Pacifico</option>
+      <option value="Lobster">Lobster</option>
+    </select>
+    <span class="grp only-text">
+      <button id="szMinus" aria-label="Меньше">−</button>
+      <input id="fontSize" type="number" min="8" max="300" inputmode="numeric" aria-label="Размер">
+      <button id="szPlus" aria-label="Больше">＋</button>
+    </span>
+    <button data-fmt="bold" class="only-text"><b>B</b></button>
+    <button data-fmt="italic" class="only-text"><i>I</i></button>
+    <button data-fmt="underline" class="only-text"><u>U</u></button>
+    <button data-align="left" class="only-text" aria-label="Влево">⇤</button>
+    <button data-align="center" class="only-text" aria-label="По центру">↔</button>
+    <button data-align="right" class="only-text" aria-label="Вправо">⇥</button>
+    <label class="only-shape">Толщина <input id="sw" type="range" min="2" max="30"></label>
+    <label>Поворот <input id="rot" type="range" min="-180" max="180"></label>
+    <button id="btnFront" aria-label="Наверх">⬆</button>
+    <button id="btnBack" aria-label="Вниз">⬇</button>
+    <button id="btnDelEl" aria-label="Удалить элемент">🗑</button>
+  </div>
+
+  <div class="stage-wrap" id="stageWrap">
+    <div class="stage-box" id="stageBox"><div class="stage editing" id="stage"></div></div>
+  </div>
+
+  <div class="strip">
+    <div id="thumbs"></div>
+    <button id="btnPresent" class="play" aria-label="Показ">▶</button>
+  </div>
   <input type="file" id="fileImage" accept="image/*" hidden>
 </div>
 
-<main class="layout">
-  <aside class="sidebar">
-    <div id="thumbs"></div>
-    <div class="slide-actions">
-      <button id="btnAddSlide" class="primary">＋ Слайд</button>
-      <button id="btnDupSlide">Копия</button>
-      <button id="btnDelSlide">Удалить</button>
+<!-- Выбор цвета -->
+<div id="colorModal" class="modal" hidden>
+  <div class="color-card">
+    <div class="color-head"><span>Цвет</span><button id="colorDone">Готово</button></div>
+    <div class="color-body">
+      <div class="wheel" id="wheel">
+        <div class="ring" id="ring"></div>
+        <div class="sv" id="sv"></div>
+        <div class="mark" id="markH"></div>
+        <div class="mark" id="markSV"></div>
+      </div>
+      <div class="hex-row">
+        <input id="hex" value="#000000" maxlength="7" spellcheck="false" aria-label="Код цвета">
+        <div id="presets" class="presets"></div>
+      </div>
     </div>
-  </aside>
-  <section class="stage-wrap" id="stageWrap">
-    <div class="stage" id="stage"></div>
-  </section>
-</main>
+  </div>
 </div>
 
+<!-- Название презентации -->
+<div id="nameModal" class="modal" hidden>
+  <div class="name-card">
+    <label for="nameInput">Название презентации</label>
+    <input id="nameInput" maxlength="60" placeholder="Например: Мой доклад" autocomplete="off">
+    <div class="name-btns">
+      <button id="nameCancel">Отмена</button>
+      <button id="nameOk" class="primary">Готово</button>
+    </div>
+  </div>
+</div>
+
+<!-- Показ -->
 <div id="presenter" class="presenter" hidden>
   <div class="stage" id="presStage"></div>
-  <div class="pres-hint">← → листать · Esc выход</div>
+  <button id="presClose" class="pres-close" aria-label="Закрыть показ">✕</button>
 </div>
 
-<div id="printArea"></div>
+<div id="toast" class="toast" hidden></div>
 <script src="app.js"></script>
 </body>
 </html>
