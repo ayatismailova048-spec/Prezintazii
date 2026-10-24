@@ -392,9 +392,16 @@ function renderHome() {
   lib.pres.slice().sort((a, b) => b.updated - a.updated).forEach(p => {
     const card = document.createElement('div');
     card.className = 'card';
+    const head = document.createElement('div');
+    head.className = 'card-head';
     const name = document.createElement('div');
     name.className = 'card-name';
     name.textContent = p.title || 'Без названия';
+    const lnk = document.createElement('button');
+    lnk.className = 'card-link'; lnk.title = 'Скопировать ссылку'; lnk.setAttribute('aria-label', 'Скопировать ссылку на презентацию');
+    lnk.textContent = '🔗';
+    lnk.onclick = ev => { ev.stopPropagation(); copyLinkFor(p); };
+    head.append(name, lnk);
     const prev = document.createElement('div');
     prev.className = 'card-prev';
     const tools = document.createElement('div');
@@ -411,7 +418,7 @@ function renderHome() {
       setTimeout(() => { del.classList.remove('armed'); del.textContent = '×'; }, 3000);
     };
     tools.append(ren, del);
-    card.append(name, prev, tools);
+    card.append(head, prev, tools);
     card.onclick = () => openPres(p);
     grid.appendChild(card);
     const mini = document.createElement('div');
@@ -478,6 +485,18 @@ async function readShareLink(hash) {
   if (!d || !Array.isArray(d.s) || !d.s.length) throw 0;
   return { id: uid(), title: d.t || 'Без названия', updated: Date.now(),
     slides: d.s.map(s => ({ id: uid(), bg: s.bg || '#ffffff', els: (s.els || []).map(e => ({ ...e, id: uid() })) })) };
+}
+async function copyLinkFor(p) { // ссылка на презентацию: копируется одним нажатием на 🔗 у названия
+  if (typeof CompressionStream === 'undefined') return toast('Этот браузер не умеет делать ссылки. Обновите Chrome.');
+  toast('Готовим ссылку…');
+  let link;
+  try { link = await makeShareLink(p); } catch (e) { return toast('Не получилось сделать ссылку'); }
+  try { await navigator.clipboard.writeText(link); toast('Ссылка скопирована. Её можно отправить: по ней презентацию можно только смотреть.'); }
+  catch (e) { // если браузер не дал скопировать сам, показываем ссылку для ручного копирования
+    $('#shareLink').value = link; $('#shareInfo').textContent = 'Выделите ссылку и скопируйте её.';
+    $('#shareSend').hidden = !navigator.share; $('#shareModal').hidden = false;
+    $('#shareLink').focus(); $('#shareLink').select();
+  }
 }
 $('#btnShare').onclick = async () => {
   blurEditing();
